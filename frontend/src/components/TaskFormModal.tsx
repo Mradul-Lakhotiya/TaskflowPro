@@ -90,7 +90,9 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
         finalTask = latestTask;
       }
 
-      onSuccess(finalTask, !!taskToEdit);
+      if (finalTask) {
+        onSuccess(finalTask, !!taskToEdit);
+      }
       onClose();
     } catch (err: any) {
       setError(err.response?.data || "An error occurred while saving the task.");
