@@ -240,3 +240,28 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 
 	return tasks, total, nil
 }
+
+// UploadAttachment updates a task with its new attachment URL
+func UploadAttachment(ctx context.Context, taskID int, userID int, role string, url string) (*Task, error) {
+	query := `
+		UPDATE tasks 
+		SET attachment_url = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2 AND ($3 = 'admin' OR user_id = $4)
+		RETURNING id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at`
+
+	var task Task
+	err := database.DB.QueryRow(ctx, query, url, taskID, role, userID).Scan(
+		&task.ID, &task.UserID, &task.Title, &task.Description,
+		&task.Status, &task.Priority, &task.AttachmentURL, &task.DueDate,
+		&task.CreatedAt, &task.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	return &task, nil
+}
