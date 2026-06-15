@@ -2,14 +2,14 @@
 
 A premium, full-stack task management application built as part of the Rival assessment.
 
-## 🚀 Tech Stack
+## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS v4, Framer Motion, Zustand
 - **Backend**: Go 1.22+, `chi` router, `pgx` (PostgreSQL driver), JWT Auth
 - **Database**: PostgreSQL 16+
 - **DevOps**: Docker, Docker Compose, GitHub Actions
 
-## ✨ Features Implemented
+## Features Implemented
 
 - **Core Task API**: Full CRUD operations for tasks with PostgreSQL persistence.
 - **Authentication**: Secure JWT-based login/register with bcrypt password hashing.
@@ -22,7 +22,7 @@ A premium, full-stack task management application built as part of the Rival ass
 - **Activity Log**: View a complete historical timeline of changes made to each task.
 - **CI Pipeline**: Automated testing and build verification via GitHub Actions.
 
-## 🛠️ Local Setup Instructions
+## Local Setup Instructions
 
 There are two ways to run this project: using Docker (recommended) or natively.
 
@@ -54,7 +54,7 @@ npm install
 npm run dev
 ```
 
-## 🔐 Creating an Admin User
+## Creating an Admin User
 
 By default, all new signups are assigned the standard `user` role to prevent Mass Assignment vulnerabilities. However, you can bootstrap an `admin` account by passing a secret authorization header to the registration endpoint.
 
@@ -68,7 +68,7 @@ curl -X POST http://localhost:8080/api/auth/register \
 -d '{"email":"admin@rival.io", "password":"password123"}'
 ```
 
-## 📂 Architecture, Trade-offs & Shortcomings
+## Architecture, Trade-offs & Shortcomings
 
 1. **Go Standard Library vs Heavy Frameworks**: I chose `go-chi/chi` with the standard `net/http` over heavy frameworks like Gin or Fiber. It's idiomatic, highly performant, and keeps the binary small while providing excellent routing capabilities.
 2. **Pure SQL vs ORM**: I used raw SQL with `pgx` instead of GORM. For a task manager, writing raw SQL ensures maximum performance and complete control over complex queries (like dynamic filtering and sorting).
@@ -76,7 +76,7 @@ curl -X POST http://localhost:8080/api/auth/register \
 4. **Relational Attachments vs JSONB**: I deliberately chose a separate `task_attachments` SQL table instead of a JSON array to ensure strict data integrity and atomic deletion of specific files without race conditions.
 5. **Real-time updates (Shortcoming)**: While attempting to implement Server-Sent Events (SSE) for live task updates, the connection stability proved challenging and it is currently not fully working. This is a known shortcoming that I would address with more time by transitioning to robust WebSockets or refining the SSE stream management.
 
-## 🧪 Testing
+## Testing
 
 The backend includes automated tests.
 ```bash
