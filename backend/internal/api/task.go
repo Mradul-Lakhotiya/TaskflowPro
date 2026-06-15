@@ -96,15 +96,18 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		sortDesc = true
 	}
 
+	filterUserID, _ := strconv.Atoi(q.Get("user_id"))
+
 	filter := repository.TaskFilter{
-		UserID:   user.UserID,
-		Role:     user.Role,
-		Status:   q.Get("status"),
-		Search:   q.Get("search"),
-		SortBy:   q.Get("sort_by"),
-		SortDesc: sortDesc,
-		Page:     page,
-		Limit:    limit,
+		UserID:       user.UserID,
+		Role:         user.Role,
+		FilterUserID: filterUserID,
+		Status:       q.Get("status"),
+		Search:       q.Get("search"),
+		SortBy:       q.Get("sort_by"),
+		SortDesc:     sortDesc,
+		Page:         page,
+		Limit:        limit,
 	}
 
 	tasks, total, err := repository.ListTasks(r.Context(), filter)

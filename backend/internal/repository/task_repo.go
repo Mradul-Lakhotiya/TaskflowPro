@@ -24,14 +24,15 @@ type Task struct {
 }
 
 type TaskFilter struct {
-	UserID   int
-	Role     string // "admin" can see all tasks if we want, but for now we filter by UserID if not admin
-	Status   string
-	Search   string
-	SortBy   string // due_date, priority, created_at
-	SortDesc bool
-	Page     int
-	Limit    int
+	UserID       int
+	Role         string // "admin" can see all tasks if we want, but for now we filter by UserID if not admin
+	FilterUserID int    // specific user to filter by for admins
+	Status       string
+	Search       string
+	SortBy       string // due_date, priority, created_at
+	SortDesc     bool
+	Page         int
+	Limit        int
 }
 
 var ErrTaskNotFound = errors.New("task not found or unauthorized")
@@ -145,6 +146,10 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 	if filter.Role != "admin" {
 		whereParts = append(whereParts, fmt.Sprintf("user_id = $%d", argID))
 		args = append(args, filter.UserID)
+		argID++
+	} else if filter.FilterUserID > 0 {
+		whereParts = append(whereParts, fmt.Sprintf("user_id = $%d", argID))
+		args = append(args, filter.FilterUserID)
 		argID++
 	}
 

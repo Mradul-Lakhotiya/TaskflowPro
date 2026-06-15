@@ -50,3 +50,29 @@ func GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	}
 	return &user, nil
 }
+
+// ListUsers retrieves all users from the database, omitting sensitive information.
+func ListUsers(ctx context.Context) ([]User, error) {
+	query := "SELECT id, email, role FROM users ORDER BY created_at DESC"
+	
+	rows, err := database.DB.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Email, &u.Role); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}

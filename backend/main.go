@@ -61,6 +61,8 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(api.AuthMiddleware)
 			
+			r.Get("/users", api.GetUsersHandler)
+
 			r.Route("/tasks", func(r chi.Router) {
 				r.Post("/", api.CreateTaskHandler)
 				r.Get("/", api.GetTasksHandler)

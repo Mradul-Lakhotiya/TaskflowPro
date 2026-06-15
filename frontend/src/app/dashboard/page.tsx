@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Search, Filter, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, LogOut, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import TaskCard, { Task } from "@/components/TaskCard";
@@ -13,6 +13,10 @@ export default function Dashboard() {
   const { user, logout } = useAuthStore();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Admin User Filter
+  const [users, setUsers] = useState<{id: number, email: string}[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
   
   // Filters & Sorting & Pagination
   const [search, setSearch] = useState("");
@@ -38,6 +42,7 @@ export default function Dashboard() {
           status,
           sort_by: sortBy,
           sort_desc: sortDesc,
+          user_id: selectedUserId || undefined,
         },
       });
       setTasks(data.data || []);
@@ -47,7 +52,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, status, sortBy, sortDesc]);
+  }, [page, limit, search, status, sortBy, sortDesc, selectedUserId]);
 
   // Debounced search
   useEffect(() => {
@@ -56,7 +61,16 @@ export default function Dashboard() {
       fetchTasks();
     }, 300);
     return () => clearTimeout(handler);
-  }, [search, status, sortBy, sortDesc, fetchTasks]);
+  }, [search, status, sortBy, sortDesc, selectedUserId, fetchTasks]);
+
+  // Fetch users for admin filter
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      api.get("/users")
+        .then(res => setUsers(res.data || []))
+        .catch(err => console.error("Failed to fetch users", err));
+    }
+  }, [user]);
 
   const handleUpdateTask = (updatedTask: Task) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
@@ -138,7 +152,23 @@ export default function Dashboard() {
               />
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
+              {user?.role === 'admin' && (
+                <div className="relative">
+                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="appearance-none bg-accent/30 border border-transparent hover:border-border focus:border-border rounded-[var(--radius-md)] pl-9 pr-8 py-2.5 outline-none transition-all cursor-pointer font-medium text-accent-foreground"
+                  >
+                    <option value="">All Users</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.email}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="relative">
                 <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
                 <select
