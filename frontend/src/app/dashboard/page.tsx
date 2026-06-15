@@ -101,7 +101,7 @@ export default function Dashboard() {
 
     eventSource.onerror = (error) => {
       console.error("SSE Error:", error);
-      eventSource.close();
+      // Let the browser automatically reconnect
     };
 
     return () => {

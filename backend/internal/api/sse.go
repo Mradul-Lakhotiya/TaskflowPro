@@ -65,9 +65,8 @@ func (h *SSEHub) Run() {
 					select {
 					case client.send <- event:
 					default:
-						// If the client's send buffer is full, disconnect them
-						close(client.send)
-						delete(h.clients, client)
+						// If the client's send buffer is full, just drop the event
+						log.Printf("Buffer full for client %d, dropping event", client.UserID)
 					}
 				}
 			}
@@ -120,14 +119,29 @@ func ServeSSE(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "event: connected\ndata: {\"status\":\"connected\"}\n\n")
 	flusher.Flush()
 
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
 	// Listen for events to send to the client
-	for event := range client.send {
-		data, err := json.Marshal(event)
-		if err != nil {
-			log.Printf("Error marshaling SSE event: %v", err)
-			continue
+	for {
+		select {
+		case event, ok := <-client.send:
+			if !ok {
+				return
+			}
+			data, err := json.Marshal(event)
+			if err != nil {
+				log.Printf("Error marshaling SSE event: %v", err)
+				continue
+			}
+			fmt.Fprintf(w, "event: message\ndata: %s\n\n", data)
+			flusher.Flush()
+		case <-ticker.C:
+			// Ping to keep connection alive and prevent proxy timeouts
+			fmt.Fprintf(w, "event: ping\ndata: {}\n\n")
+			flusher.Flush()
+		case <-notify:
+			return
 		}
-		fmt.Fprintf(w, "event: message\ndata: %s\n\n", data)
-		flusher.Flush()
 	}
 }
