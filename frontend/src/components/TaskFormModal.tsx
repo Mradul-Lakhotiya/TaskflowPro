@@ -73,12 +73,13 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
 
       // If files were selected, upload them now
       if (files && files.length > 0 && finalTask) {
+        const taskId = finalTask.id;
         let latestTask = finalTask;
         await Promise.all(
           Array.from(files).map(async (file) => {
             const formData = new FormData();
             formData.append('file', file);
-            const uploadRes = await api.post(`/tasks/${finalTask.id}/upload`, formData, {
+            const uploadRes = await api.post(`/tasks/${taskId}/upload`, formData, {
               headers: { 'Content-Type': 'multipart/form-data' },
             });
             latestTask = uploadRes.data;
