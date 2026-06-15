@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import TaskCard, { Task } from "@/components/TaskCard";
 import TaskFormModal from "@/components/TaskFormModal";
+import ActivityModal from "@/components/ActivityModal";
 import CustomSelect from "@/components/CustomSelect";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
@@ -31,6 +32,10 @@ export default function Dashboard() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+
+  // Activity Modal State
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [activityTaskId, setActivityTaskId] = useState<number | null>(null);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -130,6 +135,11 @@ export default function Dashboard() {
   const openEditModal = (task: Task) => {
     setTaskToEdit(task);
     setIsModalOpen(true);
+  };
+
+  const openActivityModal = (taskId: number) => {
+    setActivityTaskId(taskId);
+    setIsActivityModalOpen(true);
   };
 
   const totalPages = Math.max(1, Math.ceil(totalTasks / limit));
@@ -269,6 +279,7 @@ export default function Dashboard() {
                     onUpdate={handleUpdateTask}
                     onDelete={handleDeleteTask}
                     onEdit={openEditModal}
+                    onActivityClick={openActivityModal}
                   />
                 ))}
               </AnimatePresence>
@@ -307,6 +318,12 @@ export default function Dashboard() {
         onClose={() => setIsModalOpen(false)}
         taskToEdit={taskToEdit}
         onSuccess={handleModalSuccess}
+      />
+
+      <ActivityModal
+        isOpen={isActivityModalOpen}
+        onClose={() => setIsActivityModalOpen(false)}
+        taskId={activityTaskId}
       />
     </ProtectedRoute>
   );

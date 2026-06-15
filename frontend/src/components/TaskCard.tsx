@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { CheckCircle2, Circle, Clock, Trash2, Edit2, AlertCircle, Paperclip } from "lucide-react";
+import { CheckCircle2, Circle, Clock, Trash2, Edit2, AlertCircle, Paperclip, History } from "lucide-react";
 import api from "@/lib/api";
 
 export interface Task {
@@ -23,6 +23,7 @@ interface TaskCardProps {
   onUpdate: (task: Task) => void;
   onDelete: (id: number) => void;
   onEdit: (task: Task) => void;
+  onActivityClick: (taskId: number) => void;
 }
 
 const priorityColors = {
@@ -31,7 +32,7 @@ const priorityColors = {
   low: "text-green-600 bg-green-500/10 border-green-500/20",
 };
 
-export default function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
+export default function TaskCard({ task, onUpdate, onDelete, onEdit, onActivityClick }: TaskCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -132,10 +133,22 @@ export default function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardP
               <label 
                 htmlFor={`upload-${task.id}`}
                 className="p-1.5 text-muted-foreground hover:text-primary bg-background/50 rounded-md transition-colors cursor-pointer"
+                title="Upload Attachment"
               >
                 <Paperclip size={16} />
               </label>
-              <button onClick={() => onEdit(task)} className="p-1.5 text-muted-foreground hover:text-primary bg-background/50 rounded-md transition-colors">
+              <button 
+                onClick={() => onActivityClick(task.id)} 
+                className="p-1.5 text-muted-foreground hover:text-primary bg-background/50 rounded-md transition-colors"
+                title="View Activity Log"
+              >
+                <History size={16} />
+              </button>
+              <button 
+                onClick={() => onEdit(task)} 
+                className="p-1.5 text-muted-foreground hover:text-primary bg-background/50 rounded-md transition-colors"
+                title="Edit Task"
+              >
                 <Edit2 size={16} />
               </button>
               <button onClick={handleDelete} disabled={isDeleting} className="p-1.5 text-muted-foreground hover:text-destructive bg-background/50 rounded-md transition-colors">

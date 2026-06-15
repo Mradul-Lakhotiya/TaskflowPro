@@ -73,6 +73,7 @@ func main() {
 				r.Post("/", api.CreateTaskHandler)
 				r.Get("/", api.GetTasksHandler)
 				r.Get("/{id}", api.GetTaskByIDHandler)
+				r.Get("/{id}/activity", api.GetTaskActivityHandler)
 				r.Patch("/{id}", api.UpdateTaskHandler)
 				r.Delete("/{id}", api.DeleteTaskHandler)
 				r.Post("/{id}/upload", api.UploadAttachmentHandler)

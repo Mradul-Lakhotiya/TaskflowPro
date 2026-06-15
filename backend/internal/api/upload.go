@@ -78,6 +78,8 @@ func UploadAttachmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	repository.LogActivity(r.Context(), taskID, user.UserID, "attachment_uploaded", "Attached file: "+header.Filename)
+
 	// If SSE is active, broadcast it
 	select {
 	case AppHub.broadcast <- SSEEvent{

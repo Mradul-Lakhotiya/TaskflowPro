@@ -68,6 +68,9 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Log activity
+	repository.LogActivity(r.Context(), createdTask.ID, user.UserID, "created", "Task was created")
+
 	AppHub.broadcast <- SSEEvent{
 		Type:   "TASK_CREATED",
 		Task:   createdTask,
@@ -165,6 +168,16 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	oldTask, err := repository.GetTaskByID(r.Context(), taskID, user.UserID, user.Role)
+	if err != nil {
+		if err == repository.ErrTaskNotFound {
+			http.Error(w, "Task not found or unauthorized", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch task", http.StatusInternalServerError)
+		return
+	}
+
 	var req UpdateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
@@ -177,20 +190,27 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updates := make(map[string]interface{})
-	if req.Title != nil {
+	var details []string
+
+	if req.Title != nil && *req.Title != oldTask.Title {
 		updates["title"] = *req.Title
+		details = append(details, "Title updated")
 	}
-	if req.Description != nil {
+	if req.Description != nil && *req.Description != oldTask.Description {
 		updates["description"] = *req.Description
+		details = append(details, "Description updated")
 	}
-	if req.Status != nil {
+	if req.Status != nil && *req.Status != oldTask.Status {
 		updates["status"] = *req.Status
+		details = append(details, "Status changed to "+*req.Status)
 	}
-	if req.Priority != nil {
+	if req.Priority != nil && *req.Priority != oldTask.Priority {
 		updates["priority"] = *req.Priority
+		details = append(details, "Priority changed to "+*req.Priority)
 	}
 	if req.DueDate != nil {
 		updates["due_date"] = req.DueDate
+		details = append(details, "Due date updated")
 	}
 
 	updatedTask, err := repository.UpdateTask(r.Context(), taskID, user.UserID, user.Role, updates)
@@ -201,6 +221,17 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "Failed to update task", http.StatusInternalServerError)
 		return
+	}
+
+	if len(details) > 0 {
+		detailStr := ""
+		for i, d := range details {
+			if i > 0 {
+				detailStr += ", "
+			}
+			detailStr += d
+		}
+		repository.LogActivity(r.Context(), taskID, user.UserID, "updated", detailStr)
 	}
 
 	AppHub.broadcast <- SSEEvent{
@@ -246,4 +277,39 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func GetTaskActivityHandler(w http.ResponseWriter, r *http.Request) {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	taskIDStr := chi.URLParam(r, "id")
+	taskID, err := strconv.Atoi(taskIDStr)
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	// Verify task exists and user has access
+	_, err = repository.GetTaskByID(r.Context(), taskID, user.UserID, user.Role)
+	if err != nil {
+		if err == repository.ErrTaskNotFound {
+			http.Error(w, "Task not found or unauthorized", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to fetch task", http.StatusInternalServerError)
+		return
+	}
+
+	activities, err := repository.GetTaskActivity(r.Context(), taskID)
+	if err != nil {
+		http.Error(w, "Failed to fetch activities", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(activities)
 }
