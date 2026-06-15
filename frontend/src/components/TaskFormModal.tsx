@@ -61,7 +61,7 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
     };
 
     try {
-      let finalTask = null;
+      let finalTask: Task | null = null;
 
       if (taskToEdit) {
         const { data } = await api.patch(`/tasks/${taskToEdit.id}`, payload);
