@@ -96,6 +96,8 @@ func ServeSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	// Instruct proxies (like Nginx, Next.js) not to buffer the SSE stream
+	w.Header().Set("X-Accel-Buffering", "no")
 	// CORS headers should be handled by the global CORS middleware, but just in case:
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 

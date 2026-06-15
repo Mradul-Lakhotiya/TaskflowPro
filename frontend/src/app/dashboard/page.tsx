@@ -76,7 +76,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!token) return;
 
-    // Use Next.js API rewrite path
+    // Use Next.js API rewrite path (vital for Codespaces so browser doesn't try to hit localhost directly)
     const url = `/api/events?token=${token}`;
     const eventSource = new EventSource(url);
 
