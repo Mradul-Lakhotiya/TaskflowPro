@@ -20,8 +20,10 @@ WORKDIR /app
 # Copy the binary from the builder
 COPY --from=builder /app/task-manager .
 
-# Expose port
-EXPOSE 8080
+# Expose port (default 8080)
+ARG PORT=8080
+ENV PORT=$PORT
+EXPOSE $PORT
 
 # Command to run
 CMD ["./task-manager"]

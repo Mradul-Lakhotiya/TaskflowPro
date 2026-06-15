@@ -10,7 +10,8 @@ RUN npm ci
 COPY . .
 
 # Build Next.js
-ENV API_URL=http://backend:8080/api
+ARG API_URL=http://backend:8080/api
+ENV API_URL=$API_URL
 RUN npm run build
 
 # Production runner
@@ -25,8 +26,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-EXPOSE 3000
-ENV PORT=3000
+ARG PORT=3000
+ENV PORT=$PORT
+EXPOSE $PORT
 ENV HOSTNAME="0.0.0.0"
 
 # Note: Next.js standalone output runs server.js
