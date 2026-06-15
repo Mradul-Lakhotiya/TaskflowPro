@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -121,6 +122,7 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 
 	tasks, total, err := repository.ListTasks(r.Context(), filter)
 	if err != nil {
+		fmt.Printf("ListTasks error: %v\n", err)
 		http.Error(w, "Failed to fetch tasks", http.StatusInternalServerError)
 		return
 	}

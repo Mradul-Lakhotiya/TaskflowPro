@@ -39,6 +39,6 @@ CREATE TABLE IF NOT EXISTS task_attachments (
     task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     file_name VARCHAR(255) NOT NULL,
     file_url TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_task_attachments_task_id ON task_attachments(task_id);
