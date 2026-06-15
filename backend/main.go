@@ -31,6 +31,9 @@ func main() {
 	// Initialize Router
 	r := chi.NewRouter()
 
+	// Start SSE Hub
+	go api.AppHub.Run()
+
 	// Middleware
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -62,6 +65,7 @@ func main() {
 			r.Use(api.AuthMiddleware)
 			
 			r.Get("/users", api.GetUsersHandler)
+			r.Get("/events", api.ServeSSE)
 
 			r.Route("/tasks", func(r chi.Router) {
 				r.Post("/", api.CreateTaskHandler)

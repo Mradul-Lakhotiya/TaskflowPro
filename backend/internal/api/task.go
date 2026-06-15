@@ -68,6 +68,12 @@ func CreateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	AppHub.broadcast <- SSEEvent{
+		Type:   "TASK_CREATED",
+		Task:   createdTask,
+		UserID: createdTask.UserID,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(createdTask)
@@ -197,6 +203,12 @@ func UpdateTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	AppHub.broadcast <- SSEEvent{
+		Type:   "TASK_UPDATED",
+		Task:   updatedTask,
+		UserID: updatedTask.UserID,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updatedTask)
 }
@@ -210,14 +222,27 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = repository.DeleteTask(r.Context(), taskID, user.UserID, user.Role)
-	if err != nil {
-		if err == repository.ErrTaskNotFound {
+	// Fetch the task first to determine its owner before deleting
+	task, fetchErr := repository.GetTaskByID(r.Context(), taskID, user.UserID, user.Role)
+	if fetchErr != nil {
+		if fetchErr == repository.ErrTaskNotFound {
 			http.Error(w, "Task not found or unauthorized", http.StatusNotFound)
 			return
 		}
 		http.Error(w, "Failed to delete task", http.StatusInternalServerError)
 		return
+	}
+
+	err = repository.DeleteTask(r.Context(), taskID, user.UserID, user.Role)
+	if err != nil {
+		http.Error(w, "Failed to delete task", http.StatusInternalServerError)
+		return
+	}
+
+	AppHub.broadcast <- SSEEvent{
+		Type:   "TASK_DELETED",
+		TaskID: taskID,
+		UserID: task.UserID,
 	}
 
 	w.WriteHeader(http.StatusNoContent)

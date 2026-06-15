@@ -10,7 +10,7 @@ import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 
 export default function Dashboard() {
-  const { user, logout } = useAuthStore();
+  const { user, token, logout } = useAuthStore();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -71,6 +71,43 @@ export default function Dashboard() {
         .catch(err => console.error("Failed to fetch users", err));
     }
   }, [user]);
+
+  // Real-time SSE connection
+  useEffect(() => {
+    if (!token) return;
+
+    // Use Next.js API rewrite path
+    const url = `/api/events?token=${token}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onopen = () => {
+      console.log("SSE connected");
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("SSE Event Received:", data);
+        
+        // Skip the initial connected event
+        if (data.status === "connected") return;
+
+        // On any task event, re-fetch tasks to guarantee exact sorting/pagination
+        fetchTasks();
+      } catch (err) {
+        console.error("Failed to parse SSE event", err);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("SSE Error:", error);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [token, fetchTasks]);
 
   const handleUpdateTask = (updatedTask: Task) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
