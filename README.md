@@ -17,40 +17,42 @@ A premium, full-stack task management application built as part of the Rival ass
 - **Advanced Filtering**: Status filters, search by title, and multi-field sorting (due date, priority, creation date) working seamlessly together with pagination.
 - **Optimistic UI**: Instant state updates on the frontend when toggling task completion, with automatic rollback on failure.
 - **Dark Mode**: Native system-preference dark mode with custom Tailwind CSS variables.
-- **Role-Based Access**: Built-in `admin` role support (can view all tasks, though UI defaults to viewing own tasks).
+- **Role-Based Access**: Built-in `admin` role support (can view all tasks).
+- **Task Attachments**: Upload multiple images or document files directly to a task.
+- **Activity Log**: View a complete historical timeline of changes made to each task.
+- **CI Pipeline**: Automated testing and build verification via GitHub Actions.
 
 ## 🛠️ Local Setup Instructions
 
-There are two ways to run this project: using Docker (recommended for Codespaces) or natively.
+There are two ways to run this project: using Docker (recommended) or natively.
 
-### Prerequisites
-- Node.js v20+
-- Go v1.22+
-- PostgreSQL (if not using Docker)
-
-### 1. Database Setup (Docker - Recommended)
-The fastest way to get the database running, especially in GitHub Codespaces:
+### 1. Dockerized Setup (One-Command Setup)
+The fastest way to get the entire stack (Database, Backend, and Frontend) running:
 ```bash
-docker-compose up -d
+docker compose up --build -d
 ```
-*This starts a PostgreSQL container on port 5432 and automatically applies the schema from `backend/schema.sql`.*
+*This spins up PostgreSQL on port `5432` (automatically running `schema.sql`), the Go backend on `8080`, and the Next.js frontend on `3000`.*
 
-### 2. Backend Setup
+### 2. Native Setup
+If you prefer to run things natively:
+
+**Database Setup**
+Ensure PostgreSQL is running locally, and execute `backend/schema.sql` to initialize the tables.
+
+**Backend Setup**
 ```bash
 cd backend
 go mod download
-# Make sure .env is created at the root level (copy from .env.example)
+# Ensure .env is created at the root level (copy from .env.example)
 go run main.go
 ```
-*The backend will run on `http://localhost:8080`.*
 
-### 3. Frontend Setup
+**Frontend Setup**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*The frontend will run on `http://localhost:3000`.*
 
 ## 🔐 Creating an Admin User
 
@@ -65,19 +67,18 @@ curl -X POST http://localhost:8080/api/auth/register \
 -H "X-Admin-Secret: super_secret_bootstrap_key_123" \
 -d '{"email":"admin@rival.io", "password":"password123"}'
 ```
-*If the secret perfectly matches the backend config, the new account will be permanently elevated to Admin.*
 
-## 📂 Architecture & Trade-offs
+## 📂 Architecture, Trade-offs & Shortcomings
 
 1. **Go Standard Library vs Heavy Frameworks**: I chose `go-chi/chi` with the standard `net/http` over heavy frameworks like Gin or Fiber. It's idiomatic, highly performant, and keeps the binary small while providing excellent routing capabilities.
 2. **Pure SQL vs ORM**: I used raw SQL with `pgx` instead of GORM. For a task manager, writing raw SQL ensures maximum performance and complete control over complex queries (like dynamic filtering and sorting).
 3. **Tailwind CSS v4 + Framer Motion**: Instead of relying on a bulky UI library like Material UI, I built custom components using pure Tailwind and Framer Motion. This guarantees a truly custom, premium aesthetic without the generic "bootstrap" feel.
-4. **Optimistic UI**: Implemented on the task completion toggle. It provides a highly responsive feel. If the server request fails, the UI rolls back automatically.
-5. **Bonus Features Deferred**: As discussed, WebSockets and File Attachments were deferred to focus on delivering a highly polished core experience first, keeping the architecture extensible for future integration.
+4. **Relational Attachments vs JSONB**: I deliberately chose a separate `task_attachments` SQL table instead of a JSON array to ensure strict data integrity and atomic deletion of specific files without race conditions.
+5. **Real-time updates (Shortcoming)**: While attempting to implement Server-Sent Events (SSE) for live task updates, the connection stability proved challenging and it is currently not fully working. This is a known shortcoming that I would address with more time by transitioning to robust WebSockets or refining the SSE stream management.
 
 ## 🧪 Testing
 
-The backend includes automated tests for the authentication utilities and middleware.
+The backend includes automated tests.
 ```bash
 cd backend
 go test -v ./...
