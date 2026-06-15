@@ -56,8 +56,22 @@ func main() {
 	})
 
 	r.Route("/api", func(r chi.Router) {
+		// Public routes
 		r.Post("/auth/register", api.RegisterHandler)
 		r.Post("/auth/login", api.LoginHandler)
+
+		// Protected routes
+		r.Group(func(r chi.Router) {
+			r.Use(api.AuthMiddleware)
+			
+			r.Route("/tasks", func(r chi.Router) {
+				r.Post("/", api.CreateTaskHandler)
+				r.Get("/", api.GetTasksHandler)
+				r.Get("/{id}", api.GetTaskByIDHandler)
+				r.Patch("/{id}", api.UpdateTaskHandler)
+				r.Delete("/{id}", api.DeleteTaskHandler)
+			})
+		})
 	})
 
 	// Start Server
