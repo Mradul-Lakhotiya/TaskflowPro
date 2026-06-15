@@ -10,7 +10,7 @@ RUN npm ci
 COPY . .
 
 # Build Next.js
-ENV NEXT_PUBLIC_API_URL=http://localhost:8080/api
+ENV API_URL=http://backend:8080/api
 RUN npm run build
 
 # Production runner

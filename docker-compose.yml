@@ -46,8 +46,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Use localhost for client-side fetches since browser executes it locally, not inside Docker network
-      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
+      # Internal API proxy destination
+      - API_URL=http://backend:8080/api
     depends_on:
       - backend
     restart: unless-stopped
