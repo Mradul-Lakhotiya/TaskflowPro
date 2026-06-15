@@ -73,8 +73,19 @@ func main() {
 				r.Get("/{id}", api.GetTaskByIDHandler)
 				r.Patch("/{id}", api.UpdateTaskHandler)
 				r.Delete("/{id}", api.DeleteTaskHandler)
+				r.Post("/{id}/upload", api.UploadAttachmentHandler)
 			})
 		})
+	})
+
+	// Serve static uploads
+	workDir, _ := os.Getwd()
+	filesDir := http.Dir(filepath.Join(workDir, "uploads"))
+	r.Get("/uploads/*", func(w http.ResponseWriter, r *http.Request) {
+		rctx := chi.RouteContext(r.Context())
+		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, http.FileServer(filesDir))
+		fs.ServeHTTP(w, r)
 	})
 
 	// Start Server

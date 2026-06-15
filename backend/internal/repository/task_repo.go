@@ -13,14 +13,15 @@ import (
 
 type Task struct {
 	ID          int        `json:"id"`
-	UserID      int        `json:"user_id"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Status      string     `json:"status"`
-	Priority    string     `json:"priority"`
-	DueDate     *time.Time `json:"due_date"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	UserID        int        `json:"user_id"`
+	Title         string     `json:"title"`
+	Description   string     `json:"description"`
+	Status        string     `json:"status"`
+	Priority      string     `json:"priority"`
+	AttachmentURL *string    `json:"attachment_url"`
+	DueDate       *time.Time `json:"due_date"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 type TaskFilter struct {
@@ -39,10 +40,8 @@ var ErrTaskNotFound = errors.New("task not found or unauthorized")
 
 func CreateTask(ctx context.Context, t *Task) (*Task, error) {
 	err := database.DB.QueryRow(ctx,
-		`INSERT INTO tasks (user_id, title, description, status, priority, due_date) 
-		 VALUES ($1, $2, $3, $4, $5, $6) 
-		 RETURNING id, created_at, updated_at`,
-		t.UserID, t.Title, t.Description, t.Status, t.Priority, t.DueDate,
+		"INSERT INTO tasks (user_id, title, description, status, priority, attachment_url, due_date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at, updated_at",
+		t.UserID, t.Title, t.Description, t.Status, t.Priority, t.AttachmentURL, t.DueDate,
 	).Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
@@ -52,18 +51,15 @@ func CreateTask(ctx context.Context, t *Task) (*Task, error) {
 }
 
 func GetTaskByID(ctx context.Context, id, userID int, role string) (*Task, error) {
-	var t Task
-	query := `SELECT id, user_id, title, description, status, priority, due_date, created_at, updated_at 
-			  FROM tasks WHERE id = $1`
-	args := []interface{}{id}
-
-	if role != "admin" {
-		query += ` AND user_id = $2`
-		args = append(args, userID)
-	}
-
-	err := database.DB.QueryRow(ctx, query, args...).Scan(
-		&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.DueDate, &t.CreatedAt, &t.UpdatedAt,
+	var task Task
+	err := database.DB.QueryRow(ctx,
+		`SELECT id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at 
+		 FROM tasks WHERE id = $1 AND ($2 = 'admin' OR user_id = $3)`,
+		id, role, userID,
+	).Scan(
+		&task.ID, &task.UserID, &task.Title, &task.Description,
+		&task.Status, &task.Priority, &task.AttachmentURL, &task.DueDate,
+		&task.CreatedAt, &task.UpdatedAt,
 	)
 
 	if err != nil {
@@ -72,7 +68,7 @@ func GetTaskByID(ctx context.Context, id, userID int, role string) (*Task, error
 		}
 		return nil, err
 	}
-	return &t, nil
+	return &task, nil
 }
 
 func UpdateTask(ctx context.Context, id, userID int, role string, updates map[string]interface{}) (*Task, error) {
@@ -102,11 +98,11 @@ func UpdateTask(ctx context.Context, id, userID int, role string, updates map[st
 		args = append(args, userID)
 	}
 
-	query += ` RETURNING id, user_id, title, description, status, priority, due_date, created_at, updated_at`
+	query += ` RETURNING id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at`
 
 	var t Task
 	err := database.DB.QueryRow(ctx, query, args...).Scan(
-		&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.DueDate, &t.CreatedAt, &t.UpdatedAt,
+		&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.AttachmentURL, &t.DueDate, &t.CreatedAt, &t.UpdatedAt,
 	)
 
 	if err != nil {
@@ -210,7 +206,7 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 	offset := (filter.Page - 1) * filter.Limit
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, title, description, status, priority, due_date, created_at, updated_at 
+		SELECT id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at 
 		FROM tasks 
 		WHERE %s 
 		ORDER BY %s 
@@ -228,7 +224,11 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 	var tasks []Task
 	for rows.Next() {
 		var t Task
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.DueDate, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(
+			&t.ID, &t.UserID, &t.Title, &t.Description, 
+			&t.Status, &t.Priority, &t.AttachmentURL, &t.DueDate, 
+			&t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
 			return nil, 0, err
 		}
 		tasks = append(tasks, t)

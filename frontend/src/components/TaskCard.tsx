@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { CheckCircle2, Circle, Clock, Trash2, Edit2, AlertCircle } from "lucide-react";
+import { CheckCircle2, Circle, Clock, Trash2, Edit2, AlertCircle, Paperclip } from "lucide-react";
 import api from "@/lib/api";
 
 export interface Task {
@@ -12,8 +12,10 @@ export interface Task {
   description: string;
   status: "pending" | "in_progress" | "completed";
   priority: "low" | "medium" | "high";
+  attachment_url?: string;
   due_date: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 interface TaskCardProps {
@@ -32,20 +34,19 @@ const priorityColors = {
 export default function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const toggleStatus = async () => {
     if (isToggling) return;
     setIsToggling(true);
     const newStatus = task.status === "completed" ? "pending" : "completed";
     
-    // Optimistic UI update
     const previousStatus = task.status;
     onUpdate({ ...task, status: newStatus });
 
     try {
       await api.patch(`/tasks/${task.id}`, { status: newStatus });
     } catch (error) {
-      // Rollback on failure
       onUpdate({ ...task, status: previousStatus });
       console.error("Failed to update status", error);
     } finally {
@@ -64,6 +65,30 @@ export default function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardP
       setIsDeleting(false);
     }
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await api.post(`/tasks/${task.id}/upload`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onUpdate(response.data);
+    } catch (err) {
+      console.error("Failed to upload file", err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const isImage = task.attachment_url?.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+  const fullAttachmentUrl = task.attachment_url ? `${backendUrl}${task.attachment_url}` : null;
 
   return (
     <motion.div
@@ -96,7 +121,20 @@ export default function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardP
             <h3 className={`font-semibold text-lg truncate ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
               {task.title}
             </h3>
-            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <input 
+                type="file" 
+                id={`upload-${task.id}`}
+                className="hidden" 
+                onChange={handleFileUpload}
+                disabled={isUploading}
+              />
+              <label 
+                htmlFor={`upload-${task.id}`}
+                className="p-1.5 text-muted-foreground hover:text-primary bg-background/50 rounded-md transition-colors cursor-pointer"
+              >
+                <Paperclip size={16} />
+              </label>
               <button onClick={() => onEdit(task)} className="p-1.5 text-muted-foreground hover:text-primary bg-background/50 rounded-md transition-colors">
                 <Edit2 size={16} />
               </button>
@@ -107,10 +145,22 @@ export default function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardP
           </div>
           
           {task.description && (
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{task.description}</p>
+            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{task.description}</p>
           )}
 
-          <div className="flex flex-wrap items-center gap-3 text-xs font-medium mt-3">
+          {fullAttachmentUrl && (
+            <div className="mt-2 mb-3 border rounded-lg overflow-hidden border-border bg-muted/30">
+              {isImage ? (
+                <img src={fullAttachmentUrl} alt="Attachment" className="w-full h-auto object-cover max-h-32" />
+              ) : (
+                <a href={fullAttachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center p-2 text-xs text-primary underline">
+                  <Paperclip size={12} className="mr-1" /> View Attachment
+                </a>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
             <span className={`px-2.5 py-1 rounded-full border capitalize flex items-center gap-1 ${priorityColors[task.priority]}`}>
               {task.priority === 'high' && <AlertCircle size={12} />}
               {task.priority} Priority
