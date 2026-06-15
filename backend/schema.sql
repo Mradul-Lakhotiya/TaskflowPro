@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     description TEXT,
     status VARCHAR(50) DEFAULT 'pending',
     priority VARCHAR(50) DEFAULT 'medium',
-    attachment_url VARCHAR(1024),
     due_date TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -34,3 +33,12 @@ CREATE TABLE IF NOT EXISTS task_activities (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_task_activities_task_id ON task_activities(task_id);
+
+CREATE TABLE IF NOT EXISTS task_attachments (
+    id SERIAL PRIMARY KEY,
+    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_url TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_task_attachments_task_id ON task_attachments(task_id);

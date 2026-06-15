@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,26 +12,34 @@ import (
 	"github.com/mradu/task-manager/internal/database"
 )
 
+type TaskAttachment struct {
+	ID        int       `json:"id"`
+	TaskID    int       `json:"task_id"`
+	FileName  string    `json:"file_name"`
+	FileURL   string    `json:"file_url"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Task struct {
-	ID          int        `json:"id"`
-	UserID        int        `json:"user_id"`
-	Title         string     `json:"title"`
-	Description   string     `json:"description"`
-	Status        string     `json:"status"`
-	Priority      string     `json:"priority"`
-	AttachmentURL *string    `json:"attachment_url"`
-	DueDate       *time.Time `json:"due_date"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID          int              `json:"id"`
+	UserID      int              `json:"user_id"`
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	Status      string           `json:"status"`
+	Priority    string           `json:"priority"`
+	Attachments []TaskAttachment `json:"attachments"`
+	DueDate     *time.Time       `json:"due_date"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
 }
 
 type TaskFilter struct {
 	UserID       int
-	Role         string // "admin" can see all tasks if we want, but for now we filter by UserID if not admin
-	FilterUserID int    // specific user to filter by for admins
+	Role         string
+	FilterUserID int
 	Status       string
 	Search       string
-	SortBy       string // due_date, priority, created_at
+	SortBy       string
 	SortDesc     bool
 	Page         int
 	Limit        int
@@ -40,26 +49,37 @@ var ErrTaskNotFound = errors.New("task not found or unauthorized")
 
 func CreateTask(ctx context.Context, t *Task) (*Task, error) {
 	err := database.DB.QueryRow(ctx,
-		"INSERT INTO tasks (user_id, title, description, status, priority, attachment_url, due_date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at, updated_at",
-		t.UserID, t.Title, t.Description, t.Status, t.Priority, t.AttachmentURL, t.DueDate,
+		"INSERT INTO tasks (user_id, title, description, status, priority, due_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at",
+		t.UserID, t.Title, t.Description, t.Status, t.Priority, t.DueDate,
 	).Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
 		return nil, err
 	}
+	t.Attachments = []TaskAttachment{} // New tasks have no attachments
 	return t, nil
 }
 
 func GetTaskByID(ctx context.Context, id, userID int, role string) (*Task, error) {
+	query := `
+		SELECT t.id, t.user_id, t.title, t.description, t.status, t.priority, t.due_date, t.created_at, t.updated_at,
+		       COALESCE(
+		           json_agg(
+		               json_build_object('id', a.id, 'task_id', a.task_id, 'file_name', a.file_name, 'file_url', a.file_url, 'created_at', a.created_at)
+		           ) FILTER (WHERE a.id IS NOT NULL), '[]'
+		       ) as attachments
+		FROM tasks t
+		LEFT JOIN task_attachments a ON t.id = a.task_id
+		WHERE t.id = $1 AND ($2 = 'admin' OR t.user_id = $3)
+		GROUP BY t.id
+	`
 	var task Task
-	err := database.DB.QueryRow(ctx,
-		`SELECT id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at 
-		 FROM tasks WHERE id = $1 AND ($2 = 'admin' OR user_id = $3)`,
-		id, role, userID,
-	).Scan(
+	var attachmentsJSON []byte
+
+	err := database.DB.QueryRow(ctx, query, id, role, userID).Scan(
 		&task.ID, &task.UserID, &task.Title, &task.Description,
-		&task.Status, &task.Priority, &task.AttachmentURL, &task.DueDate,
-		&task.CreatedAt, &task.UpdatedAt,
+		&task.Status, &task.Priority, &task.DueDate,
+		&task.CreatedAt, &task.UpdatedAt, &attachmentsJSON,
 	)
 
 	if err != nil {
@@ -68,6 +88,11 @@ func GetTaskByID(ctx context.Context, id, userID int, role string) (*Task, error
 		}
 		return nil, err
 	}
+
+	if err := json.Unmarshal(attachmentsJSON, &task.Attachments); err != nil {
+		return nil, err
+	}
+
 	return &task, nil
 }
 
@@ -86,7 +111,6 @@ func UpdateTask(ctx context.Context, id, userID int, role string, updates map[st
 		argID++
 	}
 
-	// Always update updated_at
 	setParts = append(setParts, fmt.Sprintf("updated_at = CURRENT_TIMESTAMP"))
 
 	query := fmt.Sprintf(`UPDATE tasks SET %s WHERE id = $%d`, strings.Join(setParts, ", "), argID)
@@ -98,21 +122,15 @@ func UpdateTask(ctx context.Context, id, userID int, role string, updates map[st
 		args = append(args, userID)
 	}
 
-	query += ` RETURNING id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at`
-
-	var t Task
-	err := database.DB.QueryRow(ctx, query, args...).Scan(
-		&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.AttachmentURL, &t.DueDate, &t.CreatedAt, &t.UpdatedAt,
-	)
-
+	cmdTag, err := database.DB.Exec(ctx, query, args...)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrTaskNotFound
-		}
 		return nil, err
 	}
+	if cmdTag.RowsAffected() == 0 {
+		return nil, ErrTaskNotFound
+	}
 
-	return &t, nil
+	return GetTaskByID(ctx, id, userID, role)
 }
 
 func DeleteTask(ctx context.Context, id, userID int, role string) error {
@@ -140,38 +158,36 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 	argID := 1
 
 	if filter.Role != "admin" {
-		whereParts = append(whereParts, fmt.Sprintf("user_id = $%d", argID))
+		whereParts = append(whereParts, fmt.Sprintf("t.user_id = $%d", argID))
 		args = append(args, filter.UserID)
 		argID++
 	} else if filter.FilterUserID > 0 {
-		whereParts = append(whereParts, fmt.Sprintf("user_id = $%d", argID))
+		whereParts = append(whereParts, fmt.Sprintf("t.user_id = $%d", argID))
 		args = append(args, filter.FilterUserID)
 		argID++
 	}
 
 	if filter.Status != "" {
-		whereParts = append(whereParts, fmt.Sprintf("status = $%d", argID))
+		whereParts = append(whereParts, fmt.Sprintf("t.status = $%d", argID))
 		args = append(args, filter.Status)
 		argID++
 	}
 
 	if filter.Search != "" {
-		whereParts = append(whereParts, fmt.Sprintf("title ILIKE $%d", argID))
+		whereParts = append(whereParts, fmt.Sprintf("t.title ILIKE $%d", argID))
 		args = append(args, "%"+filter.Search+"%")
 		argID++
 	}
 
 	whereClause := strings.Join(whereParts, " AND ")
 
-	// Count total rows for pagination
 	var total int
-	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM tasks WHERE %s`, whereClause)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM tasks t WHERE %s`, whereClause)
 	if err := database.DB.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	// Sorting
-	orderClause := "created_at DESC"
+	orderClause := "t.created_at DESC"
 	if filter.SortBy != "" {
 		allowedSorts := map[string]string{
 			"due_date":   "due_date",
@@ -183,20 +199,17 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 			if filter.SortDesc {
 				dir = "DESC"
 			}
-			orderClause = fmt.Sprintf("%s %s", col, dir)
+			orderClause = fmt.Sprintf("t.%s %s", col, dir)
 			
-			// Handle priority custom sorting (high > medium > low)
 			if col == "priority" {
-				orderClause = fmt.Sprintf("CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END %s", dir)
+				orderClause = fmt.Sprintf("CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END %s", dir)
 			}
-			// Handle nulls last for due date
 			if col == "due_date" {
 				orderClause += " NULLS LAST"
 			}
 		}
 	}
 
-	// Pagination
 	if filter.Limit <= 0 {
 		filter.Limit = 10
 	}
@@ -206,9 +219,16 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 	offset := (filter.Page - 1) * filter.Limit
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at 
-		FROM tasks 
+		SELECT t.id, t.user_id, t.title, t.description, t.status, t.priority, t.due_date, t.created_at, t.updated_at,
+		       COALESCE(
+		           json_agg(
+		               json_build_object('id', a.id, 'task_id', a.task_id, 'file_name', a.file_name, 'file_url', a.file_url, 'created_at', a.created_at)
+		           ) FILTER (WHERE a.id IS NOT NULL), '[]'
+		       ) as attachments
+		FROM tasks t
+		LEFT JOIN task_attachments a ON t.id = a.task_id
 		WHERE %s 
+		GROUP BY t.id
 		ORDER BY %s 
 		LIMIT $%d OFFSET $%d`, 
 		whereClause, orderClause, argID, argID+1)
@@ -224,11 +244,15 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 	var tasks []Task
 	for rows.Next() {
 		var t Task
+		var attachmentsJSON []byte
 		if err := rows.Scan(
 			&t.ID, &t.UserID, &t.Title, &t.Description, 
-			&t.Status, &t.Priority, &t.AttachmentURL, &t.DueDate, 
-			&t.CreatedAt, &t.UpdatedAt,
+			&t.Status, &t.Priority, &t.DueDate, 
+			&t.CreatedAt, &t.UpdatedAt, &attachmentsJSON,
 		); err != nil {
+			return nil, 0, err
+		}
+		if err := json.Unmarshal(attachmentsJSON, &t.Attachments); err != nil {
 			return nil, 0, err
 		}
 		tasks = append(tasks, t)
@@ -241,21 +265,35 @@ func ListTasks(ctx context.Context, filter TaskFilter) ([]Task, int, error) {
 	return tasks, total, nil
 }
 
-// UploadAttachment updates a task with its new attachment URL
-func UploadAttachment(ctx context.Context, taskID int, userID int, role string, url string) (*Task, error) {
-	query := `
-		UPDATE tasks 
-		SET attachment_url = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2 AND ($3 = 'admin' OR user_id = $4)
-		RETURNING id, user_id, title, description, status, priority, attachment_url, due_date, created_at, updated_at`
+// UploadAttachment inserts a new attachment into the task_attachments table
+func UploadAttachment(ctx context.Context, taskID int, userID int, role string, fileName string, fileURL string) (*Task, error) {
+	// First ensure the task exists and user has access
+	_, err := GetTaskByID(ctx, taskID, userID, role)
+	if err != nil {
+		return nil, err
+	}
 
-	var task Task
-	err := database.DB.QueryRow(ctx, query, url, taskID, role, userID).Scan(
-		&task.ID, &task.UserID, &task.Title, &task.Description,
-		&task.Status, &task.Priority, &task.AttachmentURL, &task.DueDate,
-		&task.CreatedAt, &task.UpdatedAt,
+	// Insert into task_attachments
+	_, err = database.DB.Exec(ctx, `
+		INSERT INTO task_attachments (task_id, file_name, file_url) 
+		VALUES ($1, $2, $3)`,
+		taskID, fileName, fileURL,
 	)
+	if err != nil {
+		return nil, err
+	}
 
+	// Also touch the updated_at on tasks
+	_, _ = database.DB.Exec(ctx, `UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`, taskID)
+
+	// Return updated task
+	return GetTaskByID(ctx, taskID, userID, role)
+}
+
+func DeleteAttachment(ctx context.Context, attachmentID int, userID int, role string) (*Task, error) {
+	// First fetch the attachment to ensure it exists and get its taskID
+	var taskID int
+	err := database.DB.QueryRow(ctx, "SELECT task_id FROM task_attachments WHERE id = $1", attachmentID).Scan(&taskID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrTaskNotFound
@@ -263,5 +301,18 @@ func UploadAttachment(ctx context.Context, taskID int, userID int, role string, 
 		return nil, err
 	}
 
-	return &task, nil
+	// Check if user has access to this task
+	_, err = GetTaskByID(ctx, taskID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+
+	// Delete it
+	_, err = database.DB.Exec(ctx, "DELETE FROM task_attachments WHERE id = $1", attachmentID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return updated task
+	return GetTaskByID(ctx, taskID, userID, role)
 }

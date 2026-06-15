@@ -77,6 +77,7 @@ func main() {
 				r.Patch("/{id}", api.UpdateTaskHandler)
 				r.Delete("/{id}", api.DeleteTaskHandler)
 				r.Post("/{id}/upload", api.UploadAttachmentHandler)
+				r.Delete("/{id}/attachments/{attachmentId}", api.DeleteAttachmentHandler)
 			})
 		})
 	})

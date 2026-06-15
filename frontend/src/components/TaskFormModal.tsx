@@ -23,7 +23,7 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<FileList | null>(null);
 
   useEffect(() => {
     if (taskToEdit) {
@@ -39,7 +39,7 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
       setStatus("pending");
       setDueDate("");
     }
-    setFile(null); // Reset file selection on open
+    setFiles(null); // Reset file selection on open
   }, [taskToEdit, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,14 +71,20 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
         finalTask = data;
       }
 
-      // If a file was selected, upload it now
-      if (file && finalTask) {
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadRes = await api.post(`/tasks/${finalTask.id}/upload`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        finalTask = uploadRes.data;
+      // If files were selected, upload them now
+      if (files && files.length > 0 && finalTask) {
+        let latestTask = finalTask;
+        await Promise.all(
+          Array.from(files).map(async (file) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            const uploadRes = await api.post(`/tasks/${finalTask.id}/upload`, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            latestTask = uploadRes.data;
+          })
+        );
+        finalTask = latestTask;
       }
 
       onSuccess(finalTask, !!taskToEdit);
@@ -177,15 +183,16 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Attachment (Optional)</label>
+                  <label className="block text-sm font-medium mb-1.5">Attachments (Optional)</label>
                   <input
                     type="file"
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    multiple
+                    onChange={(e) => setFiles(e.target.files)}
                     className="w-full bg-input/50 border border-border rounded-[var(--radius-md)] px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring text-sm file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-colors cursor-pointer"
                   />
-                  {taskToEdit?.attachment_url && !file && (
+                  {taskToEdit?.attachments && taskToEdit.attachments.length > 0 && (
                     <p className="text-xs text-muted-foreground mt-1.5">
-                      This task already has an attachment. Uploading a new one will replace it.
+                      This task already has {taskToEdit.attachments.length} attachment(s). New uploads will be added to the list.
                     </p>
                   )}
                 </div>

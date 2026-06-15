@@ -6,13 +6,21 @@ import { motion } from "framer-motion";
 import { CheckCircle2, Circle, Clock, Trash2, Edit2, AlertCircle, Paperclip, History } from "lucide-react";
 import api from "@/lib/api";
 
+export interface TaskAttachment {
+  id: number;
+  task_id: number;
+  file_name: string;
+  file_url: string;
+  created_at: string;
+}
+
 export interface Task {
   id: number;
   title: string;
   description: string;
   status: "pending" | "in_progress" | "completed";
   priority: "low" | "medium" | "high";
-  attachment_url?: string;
+  attachments: TaskAttachment[];
   due_date: string | null;
   created_at: string;
   updated_at: string;
@@ -68,28 +76,40 @@ export default function TaskCard({ task, onUpdate, onDelete, onEdit, onActivityC
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await api.post(`/tasks/${task.id}/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      onUpdate(response.data);
+      let latestTask = task;
+      await Promise.all(
+        Array.from(files).map(async (file) => {
+          const formData = new FormData();
+          formData.append('file', file);
+          const response = await api.post(`/tasks/${task.id}/upload`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          latestTask = response.data;
+        })
+      );
+      onUpdate(latestTask);
     } catch (err) {
-      console.error("Failed to upload file", err);
+      console.error("Failed to upload file(s)", err);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const isImage = task.attachment_url?.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    try {
+      const response = await api.delete(`/tasks/${task.id}/attachments/${attachmentId}`);
+      onUpdate(response.data);
+    } catch (err) {
+      console.error("Failed to delete attachment", err);
+    }
+  };
+
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-  const fullAttachmentUrl = task.attachment_url ? `${backendUrl}${task.attachment_url}` : null;
 
   return (
     <motion.div
@@ -125,6 +145,7 @@ export default function TaskCard({ task, onUpdate, onDelete, onEdit, onActivityC
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <input 
                 type="file" 
+                multiple
                 id={`upload-${task.id}`}
                 className="hidden" 
                 onChange={handleFileUpload}
@@ -161,15 +182,34 @@ export default function TaskCard({ task, onUpdate, onDelete, onEdit, onActivityC
             <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{task.description}</p>
           )}
 
-          {fullAttachmentUrl && (
-            <div className="mt-2 mb-3 border rounded-lg overflow-hidden border-border bg-muted/30">
-              {isImage ? (
-                <img src={fullAttachmentUrl} alt="Attachment" className="w-full h-auto object-cover max-h-32" />
-              ) : (
-                <a href={fullAttachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center p-2 text-xs text-primary underline">
-                  <Paperclip size={12} className="mr-1" /> View Attachment
-                </a>
-              )}
+          {task.attachments && task.attachments.length > 0 && (
+            <div className="mt-2 mb-3 flex flex-col gap-2">
+              {task.attachments.map((att) => {
+                const isImg = att.file_url.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+                const fullUrl = `${backendUrl}${att.file_url}`;
+                return (
+                  <div key={att.id} className="relative group/att border rounded-lg overflow-hidden border-border bg-muted/30">
+                    <button
+                      onClick={() => handleDeleteAttachment(att.id)}
+                      className="absolute top-1 right-1 p-1 bg-background/80 hover:bg-destructive hover:text-destructive-foreground rounded text-muted-foreground opacity-0 group-hover/att:opacity-100 transition-all z-10"
+                      title="Remove Attachment"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                    {isImg ? (
+                      <div className="relative">
+                        <img src={fullUrl} alt={att.file_name} className="w-full h-auto object-cover max-h-32" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-background/80 p-1 text-[10px] truncate px-2 text-muted-foreground">{att.file_name}</div>
+                      </div>
+                    ) : (
+                      <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="flex items-center p-2 text-xs text-primary hover:underline">
+                        <Paperclip size={12} className="mr-2 flex-shrink-0" /> 
+                        <span className="truncate">{att.file_name}</span>
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
