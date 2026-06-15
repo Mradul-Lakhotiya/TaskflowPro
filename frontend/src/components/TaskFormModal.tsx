@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { Task } from "./TaskCard";
+import CustomSelect from "./CustomSelect";
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [file, setFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (taskToEdit) {
@@ -37,6 +39,7 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
       setStatus("pending");
       setDueDate("");
     }
+    setFile(null); // Reset file selection on open
   }, [taskToEdit, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,13 +61,27 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
     };
 
     try {
+      let finalTask = null;
+
       if (taskToEdit) {
         const { data } = await api.patch(`/tasks/${taskToEdit.id}`, payload);
-        onSuccess(data, true);
+        finalTask = data;
       } else {
         const { data } = await api.post("/tasks", payload);
-        onSuccess(data, false);
+        finalTask = data;
       }
+
+      // If a file was selected, upload it now
+      if (file && finalTask) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await api.post(`/tasks/${finalTask.id}/upload`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        finalTask = uploadRes.data;
+      }
+
+      onSuccess(finalTask, !!taskToEdit);
       onClose();
     } catch (err: any) {
       setError(err.response?.data || "An error occurred while saving the task.");
@@ -138,15 +155,15 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Priority</label>
-                    <select
+                    <CustomSelect
                       value={priority}
-                      onChange={(e) => setPriority(e.target.value as any)}
-                      className="w-full bg-input/50 border border-border rounded-[var(--radius-md)] px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
+                      onChange={(val) => setPriority(val as any)}
+                      options={[
+                        { value: "low", label: "Low" },
+                        { value: "medium", label: "Medium" },
+                        { value: "high", label: "High" },
+                      ]}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Due Date</label>
@@ -159,18 +176,32 @@ export default function TaskFormModal({ isOpen, onClose, onSuccess, taskToEdit }
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Attachment (Optional)</label>
+                  <input
+                    type="file"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    className="w-full bg-input/50 border border-border rounded-[var(--radius-md)] px-4 py-2 focus:outline-none focus:ring-2 focus:ring-ring text-sm file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-colors cursor-pointer"
+                  />
+                  {taskToEdit?.attachment_url && !file && (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      This task already has an attachment. Uploading a new one will replace it.
+                    </p>
+                  )}
+                </div>
+
                 {taskToEdit && (
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Status</label>
-                    <select
+                    <CustomSelect
                       value={status}
-                      onChange={(e) => setStatus(e.target.value as any)}
-                      className="w-full bg-input/50 border border-border rounded-[var(--radius-md)] px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-ring"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
+                      onChange={(val) => setStatus(val as any)}
+                      options={[
+                        { value: "pending", label: "Pending" },
+                        { value: "in_progress", label: "In Progress" },
+                        { value: "completed", label: "Completed" },
+                      ]}
+                    />
                   </div>
                 )}
 

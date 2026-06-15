@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import TaskCard, { Task } from "@/components/TaskCard";
 import TaskFormModal from "@/components/TaskFormModal";
+import CustomSelect from "@/components/CustomSelect";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 
@@ -137,7 +138,7 @@ export default function Dashboard() {
     <ProtectedRoute>
       <div className="min-h-screen bg-background text-foreground pb-20">
         {/* Header */}
-        <header className="sticky top-0 z-30 glass border-b border-border/50">
+        <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border shadow-sm">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold shadow-lg shadow-primary/20">
@@ -191,52 +192,51 @@ export default function Dashboard() {
             
             <div className="flex gap-3 flex-wrap">
               {user?.role === 'admin' && (
-                <div className="relative">
-                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                  <select
-                    value={selectedUserId}
-                    onChange={(e) => setSelectedUserId(e.target.value)}
-                    className="appearance-none bg-accent/30 border border-transparent hover:border-border focus:border-border rounded-[var(--radius-md)] pl-9 pr-8 py-2.5 outline-none transition-all cursor-pointer font-medium text-accent-foreground"
-                  >
-                    <option value="">All Users</option>
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>{u.email}</option>
-                    ))}
-                  </select>
-                </div>
+                <CustomSelect
+                  value={selectedUserId}
+                  onChange={(val) => setSelectedUserId(val)}
+                  icon={<Users size={16} />}
+                  className="w-full sm:w-[160px]"
+                  placeholder="All Users"
+                  options={[
+                    { value: "", label: "All Users" },
+                    ...users.map(u => ({ value: u.id.toString(), label: u.email }))
+                  ]}
+                />
               )}
 
-              <div className="relative">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="appearance-none bg-input/50 border border-transparent hover:border-border focus:border-border rounded-[var(--radius-md)] pl-9 pr-8 py-2.5 outline-none transition-all cursor-pointer"
-                >
-                  <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
+              <CustomSelect
+                value={status}
+                onChange={(val) => setStatus(val)}
+                icon={<Filter size={16} />}
+                className="w-full sm:w-[160px]"
+                placeholder="All Status"
+                options={[
+                  { value: "", label: "All Status" },
+                  { value: "pending", label: "Pending" },
+                  { value: "in_progress", label: "In Progress" },
+                  { value: "completed", label: "Completed" },
+                ]}
+              />
 
-              <select
+              <CustomSelect
                 value={`${sortBy}-${sortDesc}`}
-                onChange={(e) => {
-                  const [sBy, sDesc] = e.target.value.split('-');
+                onChange={(val) => {
+                  const [sBy, sDesc] = val.split('-');
                   setSortBy(sBy);
                   setSortDesc(sDesc === 'true');
                   setPage(1);
                 }}
-                className="bg-input/50 border border-transparent hover:border-border focus:border-border rounded-[var(--radius-md)] px-4 py-2.5 outline-none transition-all cursor-pointer"
-              >
-                <option value="created_at-true">Newest First</option>
-                <option value="created_at-false">Oldest First</option>
-                <option value="due_date-false">Due Date (Soonest)</option>
-                <option value="due_date-true">Due Date (Latest)</option>
-                <option value="priority-false">Priority (High to Low)</option>
-                <option value="priority-true">Priority (Low to High)</option>
-              </select>
+                className="w-full sm:w-[220px]"
+                options={[
+                  { value: "created_at-true", label: "Newest First" },
+                  { value: "created_at-false", label: "Oldest First" },
+                  { value: "due_date-false", label: "Due Date (Soonest)" },
+                  { value: "due_date-true", label: "Due Date (Latest)" },
+                  { value: "priority-false", label: "Priority (High to Low)" },
+                  { value: "priority-true", label: "Priority (Low to High)" },
+                ]}
+              />
             </div>
           </div>
 
