@@ -14,6 +14,7 @@ type Config struct {
 	DatabaseURL string
 	JWTSecret   string
 	FrontendURL string
+	AdminSecret string
 }
 
 // AppConfig is the global configuration instance
@@ -34,6 +35,7 @@ func Load() {
 		DatabaseURL: buildDatabaseURL(),
 		JWTSecret:   getEnvOrDefault("JWT_SECRET", "super_secret_jwt_key_change_in_production"),
 		FrontendURL: getEnvOrDefault("FRONTEND_URL", "http://localhost:3000"),
+		AdminSecret: getEnvOrDefault("ADMIN_SECRET", "super_secret_bootstrap_key_123"),
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mradu/task-manager/internal/auth"
+	"github.com/mradu/task-manager/internal/config"
 	"github.com/mradu/task-manager/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,7 +17,6 @@ var validate = validator.New()
 type RegisterRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
-	Role     string `json:"role" validate:"omitempty,oneof=user admin"`
 }
 
 type LoginRequest struct {
@@ -49,9 +49,13 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	role := "user"
-	if req.Role != "" {
-		role = req.Role
+	// STRICT ROLE ASSIGNMENT
+	role := "user" // Default to the safest denominator
+
+	// Secure Bootstrap: Only upgrade to admin if the secret header matches your .env
+	providedSecret := r.Header.Get("X-Admin-Secret")
+	if providedSecret != "" && providedSecret == config.AppConfig.AdminSecret {
+		role = "admin"
 	}
 
 	user, err := repository.CreateUser(r.Context(), req.Email, string(hashedPassword), role)

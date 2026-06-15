@@ -32,6 +32,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_NAME=${DB_NAME:-task_manager}
       - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_change_in_production}
+      - ADMIN_SECRET=${ADMIN_SECRET:-super_secret_bootstrap_key_123}
       - PORT=${BACKEND_PORT:-8080}
     depends_on:
       db:
