@@ -12,20 +12,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/joho/godotenv"
-	
+
 	"github.com/mradu/task-manager/internal/api"
+	"github.com/mradu/task-manager/internal/config"
 	"github.com/mradu/task-manager/internal/database"
 )
 
 func main() {
-	// Load .env file if it exists
-	if err := godotenv.Load("../.env"); err != nil {
-		log.Println("No .env file found, relying on environment variables")
-	}
+	// Initialize centralized configuration
+	config.Load()
 
-	// Connect to Database
-	if err := database.Connect(); err != nil {
+	// Connect to Database using config URL
+	if err := database.Connect(config.AppConfig.DatabaseURL); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()
@@ -40,9 +38,8 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	// Basic CORS
-	// Basic CORS
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedOrigins:   []string{"https://*", "http://*"}, // Can also be tied to config.AppConfig.FrontendURL in a real prod env
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -75,19 +72,14 @@ func main() {
 	})
 
 	// Start Server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    ":" + config.AppConfig.Port,
 		Handler: r,
 	}
 
 	// Graceful shutdown
 	go func() {
-		log.Printf("Server starting on port %s", port)
+		log.Printf("Server starting on port %s", config.AppConfig.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}

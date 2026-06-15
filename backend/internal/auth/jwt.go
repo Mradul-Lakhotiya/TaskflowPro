@@ -2,9 +2,9 @@ package auth
 
 import (
 	"errors"
-	"os"
 	"time"
 
+	"github.com/mradu/task-manager/internal/config"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -14,11 +14,7 @@ var (
 )
 
 func getSecretKey() []byte {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "super_secret_jwt_key_change_in_production"
-	}
-	return []byte(secret)
+	return []byte(config.AppConfig.JWTSecret)
 }
 
 // Claims represents the JWT claims structure

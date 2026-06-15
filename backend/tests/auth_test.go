@@ -7,7 +7,12 @@ import (
 
 	"github.com/mradu/task-manager/internal/api"
 	"github.com/mradu/task-manager/internal/auth"
+	"github.com/mradu/task-manager/internal/config"
 )
+
+func init() {
+	config.Load()
+}
 
 func TestGenerateAndValidateToken(t *testing.T) {
 	userID := 1
