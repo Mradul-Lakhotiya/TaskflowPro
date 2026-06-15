@@ -52,6 +52,21 @@ npm run dev
 ```
 *The frontend will run on `http://localhost:3000`.*
 
+## 🔐 Creating an Admin User
+
+By default, all new signups are assigned the standard `user` role to prevent Mass Assignment vulnerabilities. However, you can bootstrap an `admin` account by passing a secret authorization header to the registration endpoint.
+
+1. Ensure your `.env` file has an `ADMIN_SECRET` configured.
+2. Run the following command in your terminal (replacing the URL and credentials as needed):
+
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+-H "Content-Type: application/json" \
+-H "X-Admin-Secret: super_secret_bootstrap_key_123" \
+-d '{"email":"admin@rival.io", "password":"password123"}'
+```
+*If the secret perfectly matches the backend config, the new account will be permanently elevated to Admin.*
+
 ## 📂 Architecture & Trade-offs
 
 1. **Go Standard Library vs Heavy Frameworks**: I chose `go-chi/chi` with the standard `net/http` over heavy frameworks like Gin or Fiber. It's idiomatic, highly performant, and keeps the binary small while providing excellent routing capabilities.
